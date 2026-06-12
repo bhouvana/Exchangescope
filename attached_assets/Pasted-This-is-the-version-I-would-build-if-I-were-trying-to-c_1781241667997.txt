@@ -1,0 +1,742 @@
+This is the version I would build if I were trying to create a project that is:
+
+* More unique than a stock dashboard
+* Smaller than a Bloomberg clone
+* Stronger than a typical fintech project
+* Heavy on C++
+* Visually impressive
+* Easy to explain during interviews
+
+---
+
+# REPLIT PROJECT PROMPT
+
+## Project Name
+
+**ExchangeScope – Interactive Stock Exchange & Matching Engine Visualizer**
+
+---
+
+## Project Vision
+
+Build a professional web application that demonstrates how modern stock exchanges work internally.
+
+The platform should not be a stock trading platform.
+
+The platform should not be a Bloomberg clone.
+
+The platform should be a financial systems visualization laboratory.
+
+Users should be able to see exactly how orders move through an exchange in the same way a CPU simulator visualizes instructions moving through a processor pipeline.
+
+The application should combine:
+
+* Real market data using yfinance
+* Custom C++ matching engine
+* Realtime order book visualization
+* Exchange pipeline animation
+* AI-powered explanations
+* Market simulation scenarios
+
+The final product should feel like:
+
+```text
+CPU Simulator
++
+TradingView
++
+NASDAQ Matching Engine Visualization
+```
+
+---
+
+# PRIMARY OBJECTIVE
+
+The main feature of the application is not stock prices.
+
+The main feature is visualizing what happens inside an exchange after an order is submitted.
+
+Example:
+
+```text
+BUY 100 AAPL @ $210
+```
+
+User should watch the order move through:
+
+```text
+Trader
+↓
+Gateway
+↓
+Risk Check
+↓
+Order Queue
+↓
+Matching Engine
+↓
+Trade Execution
+↓
+Market Data Feed
+↓
+Dashboard Update
+```
+
+Each stage should animate in real time.
+
+---
+
+# TECH STACK
+
+Frontend
+
+* React
+* TypeScript
+* Tailwind CSS
+* Framer Motion
+* Recharts
+* Zustand
+
+Backend
+
+* Node.js
+* Express
+* TypeScript
+
+Simulation Engine
+
+* Modern C++20
+
+Database
+
+* PostgreSQL
+
+Realtime
+
+* WebSockets
+
+Market Data
+
+* Python
+* yfinance
+
+AI
+
+* OpenAI API
+
+Deployment
+
+* Vercel
+* Railway
+
+---
+
+# ARCHITECTURE
+
+```text
+React Frontend
+       │
+       │ WebSocket
+       │
+Node Backend
+       │
+ ┌─────┴─────┐
+ │           │
+ │           │
+Python       C++
+Market Data  Matching Engine
+(yfinance)
+```
+
+---
+
+# C++ REQUIREMENTS
+
+The C++ portion must be treated as the core of the system.
+
+Do NOT implement matching logic in JavaScript.
+
+The matching engine must be written entirely in modern C++.
+
+Use:
+
+```cpp
+priority_queue
+unordered_map
+vector
+deque
+multiset
+chrono
+thread
+mutex
+```
+
+Implement:
+
+### Order Class
+
+```cpp
+id
+timestamp
+symbol
+type
+side
+quantity
+price
+status
+```
+
+---
+
+### Trade Class
+
+```cpp
+tradeId
+buyOrderId
+sellOrderId
+price
+quantity
+timestamp
+```
+
+---
+
+### OrderBook Class
+
+Maintain:
+
+```cpp
+Bid Orders
+Ask Orders
+```
+
+Support:
+
+```cpp
+Add Order
+Cancel Order
+Modify Order
+Execute Trade
+```
+
+---
+
+### Matching Engine
+
+Implement:
+
+```text
+Price-Time Priority
+```
+
+Rules:
+
+Best price first
+
+If prices are equal:
+
+Oldest order executes first
+
+---
+
+Support:
+
+```text
+Market Orders
+Limit Orders
+```
+
+---
+
+Implement:
+
+```text
+Partial Fills
+Full Fills
+Order Queues
+Trade Generation
+```
+
+---
+
+# MARKET DATA SERVICE
+
+Create Python microservice.
+
+Use:
+
+```python
+yfinance
+pandas
+numpy
+```
+
+Fetch:
+
+```text
+AAPL
+MSFT
+NVDA
+GOOG
+AMZN
+META
+TSLA
+```
+
+Provide:
+
+Current Price
+
+Volume
+
+Market Cap
+
+PE Ratio
+
+52 Week High
+
+52 Week Low
+
+Historical Data
+
+---
+
+Create REST endpoints:
+
+```text
+/api/stock/AAPL
+
+/api/history/AAPL
+
+/api/quote/AAPL
+```
+
+---
+
+Cache results.
+
+Update periodically.
+
+---
+
+# FRONTEND DESIGN
+
+Theme:
+
+```text
+Background:
+#0A0A0A
+
+Cards:
+#151515
+
+Accent:
+#00FF88
+
+Text:
+#FFFFFF
+```
+
+Style inspiration:
+
+TradingView
+
+Linear
+
+Bloomberg
+
+Modern SaaS
+
+---
+
+# PAGE 1
+
+MARKET OVERVIEW
+
+Display:
+
+Stock Search
+
+Watchlist
+
+Market Movers
+
+Top Gainers
+
+Top Losers
+
+Volume Leaders
+
+---
+
+Cards:
+
+```text
+AAPL
+Price
+Change %
+Volume
+```
+
+---
+
+Historical charts.
+
+Use yfinance data.
+
+---
+
+# PAGE 2
+
+ORDER BOOK VISUALIZER
+
+This page should be beautiful.
+
+Display:
+
+```text
+ASKS
+
+210.55
+210.54
+210.53
+
+-------------
+
+BIDS
+
+210.52
+210.51
+210.50
+```
+
+---
+
+Depth bars.
+
+Realtime updates.
+
+Animated changes.
+
+Flashing executions.
+
+---
+
+# PAGE 3
+
+MATCHING ENGINE PIPELINE
+
+Most important page.
+
+Visualize:
+
+```text
+Incoming Order
+
+↓
+
+Gateway
+
+↓
+
+Risk Check
+
+↓
+
+Validation
+
+↓
+
+Order Queue
+
+↓
+
+Matching Engine
+
+↓
+
+Trade Execution
+
+↓
+
+Market Data Broadcast
+
+↓
+
+Dashboard Update
+```
+
+When user submits order:
+
+Animated packet travels through each stage.
+
+Every stage lights up.
+
+Show timestamps.
+
+Show latency.
+
+---
+
+# PAGE 4
+
+EXCHANGE CONTROL CENTER
+
+Controls:
+
+```text
+Start Market
+
+Pause Market
+
+Reset Market
+
+Flash Crash
+
+Bull Market
+
+Bear Market
+
+High Volatility
+```
+
+---
+
+The simulator should create artificial traders.
+
+---
+
+# AI TRADERS
+
+Implement in backend.
+
+Types:
+
+### Retail Trader
+
+Random small orders.
+
+---
+
+### Market Maker
+
+Creates bid/ask spread.
+
+---
+
+### Momentum Trader
+
+Follows trends.
+
+---
+
+### Panic Trader
+
+Sells aggressively during crashes.
+
+---
+
+Each trader should generate:
+
+```text
+Orders
+Trades
+PnL
+Behavior Statistics
+```
+
+---
+
+# PAGE 5
+
+MARKET REPLAY
+
+Store all trades.
+
+Allow replay.
+
+Timeline slider.
+
+Example:
+
+```text
+10:00 AM
+
+Order Arrives
+
+10:00:01
+
+Order Queued
+
+10:00:02
+
+Matched
+
+10:00:02
+
+Executed
+```
+
+User can replay events.
+
+---
+
+# SYSTEM VISUALIZATION
+
+Create CPU-simulator-style visualizations.
+
+Show:
+
+### Exchange Throughput
+
+```text
+Orders Per Second
+```
+
+---
+
+### Queue Depth
+
+```text
+Orders Waiting
+```
+
+---
+
+### Trade Rate
+
+```text
+Trades Per Second
+```
+
+---
+
+### Latency
+
+```text
+Gateway Latency
+
+Queue Latency
+
+Execution Latency
+```
+
+---
+
+### Matching Statistics
+
+```text
+Orders Received
+
+Orders Filled
+
+Orders Rejected
+
+Partial Fills
+```
+
+---
+
+# DATABASE
+
+Tables:
+
+```text
+Users
+
+Orders
+
+Trades
+
+Sessions
+
+MarketEvents
+
+Watchlists
+```
+
+---
+
+# AI ASSISTANT
+
+User can ask:
+
+```text
+Why was my order delayed?
+```
+
+AI analyzes:
+
+Queue
+
+Latency
+
+Market conditions
+
+Provides explanation.
+
+---
+
+User asks:
+
+```text
+What caused the flash crash?
+```
+
+AI summarizes event sequence.
+
+---
+
+# ANIMATIONS
+
+Use Framer Motion heavily.
+
+Every order should appear as a moving packet.
+
+Every execution should flash.
+
+Every trade should animate.
+
+The application should feel alive.
+
+---
+
+# CODE QUALITY
+
+Generate:
+
+* Clean architecture
+* Type safety
+* Modular structure
+* Unit tests
+* Docker support
+* API documentation
+* README
+* Setup instructions
+
+---
+
+# FINAL GOAL
+
+The final application should feel like a professional educational platform that teaches users how stock exchanges work internally.
+
+The user should leave understanding:
+
+* Order books
+* Matching engines
+* Market structure
+* Liquidity
+* Latency
+* Trade execution
+
+in the same way a CPU simulator teaches users how a processor works internally.
+
+**Important:** Generate the project in phases. Start with:
+
+1. C++ matching engine
+2. Python yfinance service
+3. Node backend integration
+4. React dashboard
+5. Pipeline visualization
+
+Do not generate placeholder code. Produce working, production-quality implementations for each phase before moving to the next.
