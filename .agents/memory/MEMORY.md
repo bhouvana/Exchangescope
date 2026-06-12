@@ -1,0 +1,1 @@
+- [ExchangeScope architecture](exchangescope-arch.md) — C++ engine via stdio JSON; Node.js random walk; no Python; AI traders on timers; WS at /api/ws

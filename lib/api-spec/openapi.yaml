@@ -3,13 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ExchangeScope API – Stock Exchange & Matching Engine Visualizer
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stocks
+    description: Market data operations
+  - name: orders
+    description: Order book and order submission
+  - name: trades
+    description: Trade history and replay
+  - name: market
+    description: Market control and statistics
+  - name: traders
+    description: AI trader agents
+  - name: ai
+    description: AI explanations
+
 paths:
   /healthz:
     get:
@@ -24,6 +37,257 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stocks:
+    get:
+      operationId: listStocks
+      tags: [stocks]
+      summary: List all tracked stocks with current market data
+      responses:
+        "200":
+          description: List of stocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockQuote"
+
+  /stocks/{symbol}:
+    get:
+      operationId: getStock
+      tags: [stocks]
+      summary: Get current quote for a symbol
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockQuote"
+        "404":
+          description: Symbol not found
+
+  /stocks/{symbol}/history/{period}:
+    get:
+      operationId: getStockHistory
+      tags: [stocks]
+      summary: Get historical price data for a symbol
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: period
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [1d, 5d, 1mo, 3mo, 6mo, 1y]
+      responses:
+        "200":
+          description: Historical OHLCV data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OhlcBar"
+        "404":
+          description: Symbol not found
+
+  /orderbook/{symbol}:
+    get:
+      operationId: getOrderBook
+      tags: [orders]
+      summary: Get current order book for a symbol
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order book snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderBook"
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List recent orders
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: submitOrder
+      tags: [orders]
+      summary: Submit a new order to the matching engine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Order submitted and pipeline trace returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResult"
+        "400":
+          description: Invalid order
+
+  /trades:
+    get:
+      operationId: listTrades
+      tags: [trades]
+      summary: List recent executed trades
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: List of trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trade"
+
+  /trades/replay:
+    get:
+      operationId: getTradeReplay
+      tags: [trades]
+      summary: Get full trade + order event log for replay
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            description: ISO timestamp – events after this time
+      responses:
+        "200":
+          description: Ordered list of market events for replay
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketEvent"
+
+  /market/stats:
+    get:
+      operationId: getMarketStats
+      tags: [market]
+      summary: Get matching engine performance statistics
+      responses:
+        "200":
+          description: Market statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketStats"
+
+  /market/control:
+    post:
+      operationId: controlMarket
+      tags: [market]
+      summary: Send a control command to the market simulator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketControlInput"
+      responses:
+        "200":
+          description: Command acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketControlResult"
+
+  /traders:
+    get:
+      operationId: listTraders
+      tags: [traders]
+      summary: List AI traders and their statistics
+      responses:
+        "200":
+          description: List of AI traders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiTrader"
+
+  /ai/explain:
+    post:
+      operationId: explainEvent
+      tags: [ai]
+      summary: Ask AI to explain an order, trade, or market event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplainInput"
+      responses:
+        "200":
+          description: AI explanation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExplainResult"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +298,301 @@ components:
       required:
         - status
 
+    StockQuote:
+      type: object
+      required: [symbol, name, price, change, changePercent, volume, marketCap, peRatio, week52High, week52Low, updatedAt]
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        volume:
+          type: number
+        marketCap:
+          type: ["number", "null"]
+        peRatio:
+          type: ["number", "null"]
+        week52High:
+          type: number
+        week52Low:
+          type: number
+        updatedAt:
+          type: string
+
+    OhlcBar:
+      type: object
+      required: [timestamp, open, high, low, close, volume]
+      properties:
+        timestamp:
+          type: string
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: number
+
+    OrderBookLevel:
+      type: object
+      required: [price, quantity, orderCount]
+      properties:
+        price:
+          type: number
+        quantity:
+          type: number
+        orderCount:
+          type: integer
+
+    OrderBook:
+      type: object
+      required: [symbol, bids, asks, lastTradePrice, spread, updatedAt]
+      properties:
+        symbol:
+          type: string
+        bids:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderBookLevel"
+        asks:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderBookLevel"
+        lastTradePrice:
+          type: ["number", "null"]
+        spread:
+          type: ["number", "null"]
+        updatedAt:
+          type: string
+
+    Order:
+      type: object
+      required: [id, symbol, type, side, quantity, status, createdAt]
+      properties:
+        id:
+          type: string
+        symbol:
+          type: string
+        type:
+          type: string
+          enum: [market, limit]
+        side:
+          type: string
+          enum: [buy, sell]
+        quantity:
+          type: number
+        price:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, queued, partial, filled, cancelled, rejected]
+        filledQuantity:
+          type: number
+        avgFillPrice:
+          type: ["number", "null"]
+        traderId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: ["string", "null"]
+
+    OrderInput:
+      type: object
+      required: [symbol, type, side, quantity]
+      properties:
+        symbol:
+          type: string
+        type:
+          type: string
+          enum: [market, limit]
+        side:
+          type: string
+          enum: [buy, sell]
+        quantity:
+          type: number
+        price:
+          type: ["number", "null"]
+
+    PipelineStage:
+      type: object
+      required: [name, status, latencyUs, timestamp]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, done, error]
+        latencyUs:
+          type: integer
+        timestamp:
+          type: string
+        detail:
+          type: ["string", "null"]
+
+    OrderResult:
+      type: object
+      required: [order, pipeline, trades]
+      properties:
+        order:
+          $ref: "#/components/schemas/Order"
+        pipeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/PipelineStage"
+        trades:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trade"
+
+    Trade:
+      type: object
+      required: [id, symbol, price, quantity, side, buyOrderId, sellOrderId, timestamp]
+      properties:
+        id:
+          type: string
+        symbol:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: number
+        side:
+          type: string
+          enum: [buy, sell]
+        buyOrderId:
+          type: string
+        sellOrderId:
+          type: string
+        buyTraderId:
+          type: ["string", "null"]
+        sellTraderId:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+
+    MarketEvent:
+      type: object
+      required: [id, type, symbol, timestamp, data]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [order_submitted, order_queued, order_matched, order_filled, order_partial, order_cancelled, trade_executed, market_control]
+        symbol:
+          type: string
+        timestamp:
+          type: string
+        data:
+          type: object
+
+    LatencyBreakdown:
+      type: object
+      required: [gatewayUs, queueUs, matchingUs, totalUs]
+      properties:
+        gatewayUs:
+          type: integer
+        queueUs:
+          type: integer
+        matchingUs:
+          type: integer
+        totalUs:
+          type: integer
+
+    MarketStats:
+      type: object
+      required: [ordersPerSecond, tradesPerSecond, queueDepth, ordersReceived, ordersFilled, ordersRejected, partialFills, latency, marketState, uptime]
+      properties:
+        ordersPerSecond:
+          type: number
+        tradesPerSecond:
+          type: number
+        queueDepth:
+          type: integer
+        ordersReceived:
+          type: integer
+        ordersFilled:
+          type: integer
+        ordersRejected:
+          type: integer
+        partialFills:
+          type: integer
+        latency:
+          $ref: "#/components/schemas/LatencyBreakdown"
+        marketState:
+          type: string
+          enum: [running, paused, flash_crash, bull, bear, volatile]
+        uptime:
+          type: integer
+
+    MarketControlInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [start, pause, reset, flash_crash, bull, bear, volatile]
+        symbol:
+          type: ["string", "null"]
+
+    MarketControlResult:
+      type: object
+      required: [action, state, message]
+      properties:
+        action:
+          type: string
+        state:
+          type: string
+        message:
+          type: string
+
+    AiTrader:
+      type: object
+      required: [id, type, symbol, ordersPlaced, fills, pnl, isActive]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [retail, market_maker, momentum, panic]
+        symbol:
+          type: string
+        ordersPlaced:
+          type: integer
+        fills:
+          type: integer
+        pnl:
+          type: number
+        isActive:
+          type: boolean
+        lastAction:
+          type: ["string", "null"]
+
+    ExplainInput:
+      type: object
+      required: [question, context]
+      properties:
+        question:
+          type: string
+        context:
+          type: object
+          description: Any relevant data (order, trade, market stats, pipeline stages) to help AI answer
+
+    ExplainResult:
+      type: object
+      required: [explanation, reasoning]
+      properties:
+        explanation:
+          type: string
+        reasoning:
+          type: string
