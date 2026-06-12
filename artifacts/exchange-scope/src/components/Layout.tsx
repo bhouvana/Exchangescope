@@ -4,13 +4,21 @@ import { useGetMarketStats } from "@workspace/api-client-react";
 import { useMarketSocket } from "@/hooks/useMarketSocket";
 
 const NAV = [
-  { path: "/", label: "Market Overview", icon: BarChartIcon },
-  { path: "/orderbook", label: "Order Book", icon: BookIcon },
+  { path: "/",         label: "Home",            icon: HomeIcon },
+  { path: "/market",   label: "Market Overview", icon: BarChartIcon },
+  { path: "/orderbook",label: "Order Book",      icon: BookIcon },
   { path: "/pipeline", label: "Matching Engine", icon: CpuIcon },
-  { path: "/control", label: "Control Center", icon: SlidersIcon },
-  { path: "/replay", label: "Market Replay", icon: PlayIcon },
+  { path: "/control",  label: "Control Center",  icon: SlidersIcon },
+  { path: "/replay",   label: "Market Replay",   icon: PlayIcon },
 ];
 
+function HomeIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "#00FF88" : "currentColor"} strokeWidth="2">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  );
+}
 function BarChartIcon({ active }: { active: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? "#00FF88" : "currentColor"} strokeWidth="2">
@@ -56,12 +64,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isConnected } = useMarketSocket();
 
   const stateColors: Record<string, string> = {
-    running: "#00FF88",
-    paused: "#FFB800",
-    flash_crash: "#FF4444",
-    bull: "#00FF88",
-    bear: "#FF4444",
-    volatile: "#FFB800",
+    running: "#00FF88", paused: "#FFB800", flash_crash: "#FF4444",
+    bull: "#00FF88", bear: "#FF4444", volatile: "#FFB800",
   };
   const stateColor = stateColors[stats?.marketState ?? "running"] ?? "#00FF88";
 
@@ -69,41 +73,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div style={{ display: "flex", minHeight: "100vh", background: "#0A0A0A" }}>
       {/* Sidebar */}
       <div style={{
-        width: 220,
-        minWidth: 220,
+        width: 220, minWidth: 220,
         background: "#0D0D0D",
         borderRight: "1px solid #1a1a1a",
-        display: "flex",
-        flexDirection: "column",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        bottom: 0,
-        zIndex: 50,
+        display: "flex", flexDirection: "column",
+        position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50,
       }}>
         {/* Logo */}
         <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1a1a1a" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              width: 28, height: 28,
-              background: "linear-gradient(135deg, #00FF88, #00cc6a)",
-              borderRadius: 4,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="2.5">
-                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-              </svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", letterSpacing: "0.05em" }}>
-                ExchangeScope
+          <Link href="/">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <div style={{
+                width: 28, height: 28,
+                background: "linear-gradient(135deg, #00FF88, #00cc6a)",
+                borderRadius: 4,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="2.5">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+                </svg>
               </div>
-              <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                Market Lab
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", letterSpacing: "0.05em" }}>
+                  ExchangeScope
+                </div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  Market Lab · 313 Companies
+                </div>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Nav links */}
@@ -115,12 +115,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <motion.div
                   whileHover={{ x: 2 }}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 10px",
-                    borderRadius: 6,
-                    cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 10px", borderRadius: 6, cursor: "pointer",
                     background: active ? "rgba(0,255,136,0.08)" : "transparent",
                     borderLeft: active ? "2px solid #00FF88" : "2px solid transparent",
                     color: active ? "#00FF88" : "#777",
@@ -139,18 +135,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Live stats footer */}
-        <div style={{ padding: "12px 12px", borderTop: "1px solid #1a1a1a", fontSize: 10, color: "#555" }}>
-          {/* WS connection */}
+        <div style={{ padding: "12px", borderTop: "1px solid #1a1a1a", fontSize: 10, color: "#555" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <div
               className={isConnected ? "pulse-dot" : ""}
-              style={{
-                width: 6, height: 6, borderRadius: "50%",
-                background: isConnected ? stateColor : "#444",
-                flexShrink: 0,
-              }}
+              style={{ width: 6, height: 6, borderRadius: "50%", background: isConnected ? stateColor : "#444", flexShrink: 0 }}
             />
-            <span style={{ color: isConnected ? stateColor : "#444", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <span style={{ color: isConnected ? stateColor : "#444", textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 10 }}>
               {isConnected ? (stats?.marketState ?? "running") : "offline"}
             </span>
           </div>
@@ -174,6 +165,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span style={{ color: "#FFB800", fontWeight: 600 }} className="num">
                   {stats.latency?.totalUs ? `${stats.latency.totalUs}µs` : "—"}
                 </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>companies</span>
+                <span style={{ color: "#00BFFF", fontWeight: 600 }}>313</span>
               </div>
             </div>
           )}
