@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { useAuth } from "@/context/AuthContext";
 
 const C = { green: "#00FF88", red: "#FF4444", card: "#151515", border: "#1f1f1f", orange: "#FFB800", blue: "#00BFFF", purple: "#A855F7" };
 
@@ -31,14 +29,12 @@ const SectionIcon = () => (
 );
 
 export default function Reports() {
-  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
     Promise.all([
       fetch("/api/auth/orders", { credentials: "include" }).then(r => r.json()),
       fetch("/api/auth/trades", { credentials: "include" }).then(r => r.json()),
@@ -46,7 +42,7 @@ export default function Reports() {
       setOrders(Array.isArray(o) ? o : []);
       setTrades(Array.isArray(t) ? t : []);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [user]);
+  }, []);
 
   const filteredOrders = filter
     ? orders.filter(o => o.symbol.includes(filter.toUpperCase()))
@@ -60,27 +56,6 @@ export default function Reports() {
   const totalOrders = filteredOrders.length;
   const totalTrades = filteredTrades.length;
   const totalNotional = filteredTrades.reduce((s, t) => s + t.price * t.quantity, 0);
-
-  if (!user) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: 380 }}>
-          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📊</div>
-          <div style={{ fontSize: 14, color: "#555", marginBottom: 8, lineHeight: 1.6 }}>
-            Sign in to view your personal matching engine reports
-          </div>
-          <div style={{ fontSize: 10, color: "#333", marginBottom: 24, lineHeight: 1.5 }}>
-            Every order and trade you submit is saved to your account. Log in to track your full history.
-          </div>
-          <Link href="/">
-            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} style={{ padding: "12px 28px", background: "rgba(0,255,136,0.12)", border: "1px solid #00FF88", borderRadius: 6, color: "#00FF88", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "monospace" }}>
-              SIGN IN WITH GOOGLE
-            </motion.button>
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ padding: "20px 28px", minHeight: "100vh" }}>

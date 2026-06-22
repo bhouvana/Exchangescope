@@ -14,6 +14,7 @@ Real-time order matching · Live market data across 4 exchanges · AI-powered re
 [![Vite](https://img.shields.io/badge/Vite-6.3-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.1-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-exchangescope.onrender.com-00FF88?logo=render&logoColor=white)](https://exchangescope.onrender.com)
 
 </div>
 

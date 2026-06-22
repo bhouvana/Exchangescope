@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { motion, useInView } from "framer-motion";
 import { useGetMarketStats } from "@workspace/api-client-react";
-import { useAuth } from "@/context/AuthContext";
 
 const C = { green: "#00FF88", red: "#FF4444", card: "#151515", border: "#1f1f1f" };
 
@@ -159,63 +158,8 @@ const PAGES = [
   { path: "/control", label: "Control Center", desc: "Trigger market scenarios (flash crash, bull run, bear market), observe AI trader behavior, and ask the AI to explain anything about market microstructure.", color: "#FF4444" },
 ];
 
-declare global {
-  interface Window { google?: { accounts: { id: { initialize: (config: any) => void; renderButton: (el: HTMLElement, opts: any) => void; prompt: () => void } } } }
-}
-
 export default function Landing() {
   const { data: stats } = useGetMarketStats({ query: { refetchInterval: 1000, queryKey: ["market-stats"] } });
-  const { user, login, loading } = useAuth();
-  const [, navigate] = useLocation();
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-  const [loginError, setLoginError] = useState("");
-  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/config")
-      .then(r => r.json())
-      .then(cfg => setGoogleClientId(cfg.googleClientId))
-      .catch(() => setGoogleClientId(null));
-  }, []);
-
-  useEffect(() => {
-    if (user || !googleClientId) return;
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.defer = true;
-    s.onload = () => {
-      if (window.google && googleBtnRef.current) {
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: async (resp: any) => {
-            try {
-              await login(resp.credential);
-              navigate("/market");
-            } catch {
-              setLoginError("Sign in failed. Try again.");
-            }
-          },
-        });
-        window.google.accounts.id.renderButton(googleBtnRef.current, {
-          theme: "outline",
-          size: "large",
-          width: 280,
-        });
-      }
-    };
-    document.body.appendChild(s);
-    return () => { document.body.removeChild(s); };
-  }, [user, googleClientId, login, navigate]);
-
-  const handleDevLogin = async () => {
-    try {
-      await login("dev-mode");
-      navigate("/market");
-    } catch {
-      setLoginError("Dev login failed");
-    }
-  };
 
   return (
     <div style={{ background: "#0A0A0A", minHeight: "100vh", overflowX: "hidden" }}>
@@ -285,37 +229,11 @@ export default function Landing() {
             transition={{ delay: 0.6 }}
             style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}
           >
-            {user ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {user.picture && <img src={user.picture} alt="" style={{ width: 32, height: 32, borderRadius: "50%" }} />}
-                  <span style={{ color: "#00FF88", fontSize: 14 }}>Welcome back, {user.name}</span>
-                </div>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <Link href="/market">
-                    <motion.button whileHover={{ scale: 1.04 }} style={{ padding: "14px 36px", background: "rgba(0,255,136,0.12)", border: "1px solid #00FF88", borderRadius: 6, color: "#00FF88", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "monospace" }}>
-                      ENTER THE LAB
-                    </motion.button>
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                <Link href="/academy">
-                  <motion.button whileHover={{ scale: 1.04 }} style={{ padding: "12px 32px", background: "transparent", border: "1px solid #444", borderRadius: 6, color: "#aaa", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "monospace", width: 280 }}>
-                    CONTINUE AS GUEST
-                  </motion.button>
-                </Link>
-                {googleClientId ? (
-                  !loading && <div ref={googleBtnRef} style={{ minHeight: 40 }} />
-                ) : (
-                  <motion.button onClick={handleDevLogin} whileHover={{ scale: 1.04 }} style={{ padding: "12px 32px", background: "rgba(0,255,136,0.12)", border: "1px solid #00FF88", borderRadius: 6, color: "#00FF88", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "monospace", width: 280 }}>
-                    SIGN IN WITH GOOGLE
-                  </motion.button>
-                )}
-                {loginError && <div style={{ fontSize: 11, color: "#FF4444" }}>{loginError}</div>}
-              </div>
-            )}
+            <Link href="/market">
+              <motion.button whileHover={{ scale: 1.04 }} style={{ padding: "14px 48px", background: "rgba(0,255,136,0.12)", border: "1px solid #00FF88", borderRadius: 6, color: "#00FF88", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", cursor: "pointer", fontFamily: "monospace" }}>
+                GET STARTED
+              </motion.button>
+            </Link>
           </motion.div>
         </div>
 
