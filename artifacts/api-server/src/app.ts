@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import cookieParser from "cookie-parser";
+import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -32,5 +33,18 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(process.env.SESSION_SECRET ?? "dev-secret"));
 
 app.use("/api", router);
+
+// Production: Express serves the Vite-built frontend so both API and UI run on
+// the same origin (mirrors how the Vite dev-server proxy works locally).
+if (process.env.NODE_ENV === "production") {
+  const staticDir = path.resolve(
+    process.cwd(),
+    process.env.FRONTEND_DIST ?? "artifacts/exchange-scope/dist/public",
+  );
+  app.use(express.static(staticDir));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(staticDir, "index.html"));
+  });
+}
 
 export default app;
