@@ -31,7 +31,7 @@ services:
     #  5. Bundle the API server with esbuild
     buildCommand: >-
       corepack prepare pnpm@9 --activate &&
-      pnpm install &&
+      pnpm install --no-frozen-lockfile &&
       pnpm --filter @workspace/db push-force &&
       cd artifacts/exchange-scope && npx vite build &&
       cd ../api-server && node ./build.mjs
