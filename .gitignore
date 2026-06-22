@@ -56,3 +56,7 @@ Thumbs.db
 # Build artifacts
 artifacts/api-server/dist/
 artifacts/exchange-scope/dist/
+
+# C++ matching engine compiled binaries (platform-specific, compiled during build)
+artifacts/api-server/engine/matching_engine
+artifacts/api-server/engine/matching_engine.exe

@@ -27,12 +27,15 @@ services:
     #  1. Activate pnpm via corepack (built into Node 24, no root required)
     #  2. Install all workspace packages
     #  3. Push DB schema (creates/migrates tables; --force skips prompts)
-    #  4. Build the React frontend with Vite
-    #  5. Bundle the API server with esbuild
+    #  4. Compile C++ matching engine for Linux (g++ ships with Render's Ubuntu image)
+    #  5. Build the React frontend with Vite
+    #  6. Bundle the API server with esbuild
     buildCommand: >-
       corepack prepare pnpm@9 --activate &&
       pnpm install --no-frozen-lockfile &&
       pnpm --filter @workspace/db push-force &&
+      mkdir -p artifacts/api-server/engine &&
+      g++ -std=c++20 -O2 -o artifacts/api-server/engine/matching_engine artifacts/api-server/src/engine/matching_engine.cpp &&
       cd artifacts/exchange-scope && npx vite build &&
       cd ../api-server && node ./build.mjs
 

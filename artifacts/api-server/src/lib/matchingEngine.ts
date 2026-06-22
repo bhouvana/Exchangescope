@@ -79,17 +79,37 @@ class MatchingEngine {
     this.spawn();
   }
 
+  private restartCount = 0;
+  private lastSpawnTime = 0;
+  private permanentlyFailed = false;
+
   private spawn() {
+    if (this.permanentlyFailed) return;
+    if (!fs.existsSync(engineBin)) {
+      logger.warn({ engineBin }, "Engine binary not found, running without C++ engine");
+      return;
+    }
+
+    this.lastSpawnTime = Date.now();
     this.proc = spawn(engineBin, [], { stdio: ["pipe", "pipe", "pipe"] });
     this.ready = true;
+
+    // Absorb EPIPE — fired when we write to stdin after the child has already exited
+    this.proc.stdin!.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code !== "EPIPE") logger.warn({ err: err.message }, "Engine stdin error");
+    });
+
+    // Handle spawn failures (ENOENT, ENOEXEC — e.g. wrong-platform binary)
+    this.proc.on("error", (err: NodeJS.ErrnoException) => {
+      logger.warn({ err: err.message }, "Engine process error");
+      this.ready = false;
+    });
 
     const rl = createInterface({ input: this.proc.stdout! });
     rl.on("line", (line) => {
       if (!line.trim()) return;
       try {
         const data: EngineResult = JSON.parse(line);
-        // Broadcast to all pending if it's a trade, otherwise match by req
-        // Since protocol is single-threaded (one cmd -> one result), resolve oldest pending
         const [firstKey] = this.pending.keys();
         if (firstKey) {
           const p = this.pending.get(firstKey)!;
@@ -107,17 +127,30 @@ class MatchingEngine {
 
     this.proc.on("exit", (code) => {
       this.ready = false;
-      logger.warn({ code }, "Matching engine exited, restarting in 1s");
-      // Reject all pending
       for (const [, p] of this.pending) p.reject(new Error("Engine restart"));
       this.pending.clear();
+
+      const aliveMs = Date.now() - this.lastSpawnTime;
+      if (aliveMs < 500) {
+        // Crashed too fast — wrong platform binary or fatal startup error
+        this.restartCount++;
+        if (this.restartCount >= 3) {
+          logger.warn({ code, restartCount: this.restartCount }, "Engine crashes on startup, disabling C++ engine");
+          this.permanentlyFailed = true;
+          return;
+        }
+      } else {
+        this.restartCount = 0; // healthy run, reset counter
+      }
+
+      logger.warn({ code }, "Matching engine exited, restarting in 1s");
       setTimeout(() => this.spawn(), 1000);
     });
   }
 
   private async send(cmd: object): Promise<EngineResult> {
     await this.initPromise;
-    if (!this.ready || !this.proc?.stdin) {
+    if (!this.ready || !this.proc?.stdin?.writable) {
       throw new Error("Matching engine not ready");
     }
     const key = String(++this.reqCounter);
@@ -130,7 +163,13 @@ class MatchingEngine {
         resolve: (v) => { clearTimeout(timeout); resolve(v); },
         reject:  (e) => { clearTimeout(timeout); reject(e); },
       });
-      this.proc!.stdin!.write(JSON.stringify(cmd) + "\n");
+      try {
+        this.proc!.stdin!.write(JSON.stringify(cmd) + "\n");
+      } catch (err) {
+        this.pending.delete(key);
+        clearTimeout(timeout);
+        reject(new Error("Engine write failed"));
+      }
     });
   }
 
