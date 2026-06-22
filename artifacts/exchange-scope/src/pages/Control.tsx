@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   useGetMarketStats,
   useControlMarket,
-  useListTraders,
   useExplainEvent,
 } from "@workspace/api-client-react";
-
+import { useRegion } from "@/context/RegionContext";
+import { useSimulatedTraders } from "@/context/SimulatedTradersContext";
 const C = { green: "#00FF88", red: "#FF4444", card: "#151515", border: "#1f1f1f" };
 
 function fmt(n: number | null | undefined, dec = 1) {
@@ -53,14 +53,16 @@ const TRADER_COLORS: Record<string, string> = {
 };
 
 export default function Control() {
-  const { data: stats } = useGetMarketStats({ query: { refetchInterval: 800 } });
-  const { data: traders } = useListTraders({ query: { refetchInterval: 1500 } });
+  const { regionMeta } = useRegion();
+  const { data: stats } = useGetMarketStats({ query: { refetchInterval: 800 } } as any);
+  const { allTraders: traders } = useSimulatedTraders();
   const { mutate: controlMarket, isPending: controlPending } = useControlMarket();
   const { mutate: explain, isPending: explainPending } = useExplainEvent();
 
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [aiAnswer, setAiAnswer] = useState<{ explanation: string; reasoning: string } | null>(null);
+  const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
 
   const handleScenario = (action: string) => {
     controlMarket({ data: { action } as any }, {
@@ -68,7 +70,7 @@ export default function Control() {
     });
   };
 
-  const handleExplain = () => {
+  const handleExplain = (mode?: string) => {
     if (!question.trim()) return;
     explain(
       {
@@ -80,6 +82,7 @@ export default function Control() {
             tradesPerSecond: stats?.tradesPerSecond,
             queueDepth: stats?.queueDepth,
             latency: stats?.latency,
+            mode: mode ?? "concise",
           },
         } as any,
       },
@@ -89,10 +92,51 @@ export default function Control() {
     );
   };
 
+  const handleQuickQuestion = (q: string) => {
+    setQuestion(q);
+    const isExpanded = askedQuestions.has(q);
+    const mode = isExpanded ? "expanded" : "concise";
+    explain(
+      {
+        data: {
+          question: q,
+          context: {
+            marketState: stats?.marketState,
+            ordersPerSecond: stats?.ordersPerSecond,
+            tradesPerSecond: stats?.tradesPerSecond,
+            queueDepth: stats?.queueDepth,
+            latency: stats?.latency,
+            mode,
+          },
+        } as any,
+      },
+      {
+        onSuccess: (data: any) => {
+          setAiAnswer(data);
+          if (!isExpanded) {
+            setAskedQuestions(prev => new Set([...prev, q]));
+          }
+        },
+      }
+    );
+  };
+
   const stateColor: Record<string, string> = {
     running: C.green, paused: "#FFB800", flash_crash: C.red, bull: C.green, bear: C.red, volatile: "#FFB800",
   };
   const currentStateColor = stateColor[stats?.marketState ?? "running"] ?? C.green;
+
+  const totalOrdersPlaced = traders.reduce((s: number, t: any) => s + t.ordersPlaced, 0);
+  const totalFills = traders.reduce((s: number, t: any) => s + t.fills, 0);
+  const totalPnl = traders.reduce((s: number, t: any) => s + t.pnl, 0);
+  const activeTraders = traders.filter((t: any) => t.isActive).length;
+  const avgWinRate = traders.length ? traders.reduce((s: number, t: any) => s + t.winRate, 0) / traders.length : 0;
+  const longTraders = traders.filter((t: any) => t.position > 0).length;
+  const shortTraders = traders.filter((t: any) => t.position < 0).length;
+  const prevRef = useRef({ orders: totalOrdersPlaced, fills: totalFills });
+  const orderRate = Math.max(0, totalOrdersPlaced - prevRef.current.orders);
+  const fillRate = Math.max(0, totalFills - prevRef.current.fills);
+  prevRef.current = { orders: totalOrdersPlaced, fills: totalFills };
 
   return (
     <div style={{ padding: "24px 28px", minHeight: "100vh" }}>
@@ -100,7 +144,7 @@ export default function Control() {
       <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <h1 style={{ fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: "0.05em", marginBottom: 2 }}>CONTROL CENTER</h1>
-          <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.08em" }}>MARKET SCENARIOS · AI TRADERS · LIVE STATS</div>
+          <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.08em" }}>{regionMeta.exchange} · MARKET SCENARIOS · AI TRADERS · LIVE STATS</div>
         </div>
         {/* Market state badge */}
         <div style={{
@@ -155,38 +199,48 @@ export default function Control() {
         {/* Live stats */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 16 }}>
           <div style={{ fontSize: 10, color: "#555", letterSpacing: "0.1em", marginBottom: 14 }}>LIVE STATISTICS</div>
-          {stats ? (
-            <>
-              <Gauge label="ORDERS / SECOND" value={stats.ordersPerSecond ?? 0} max={1000} color={C.green} />
-              <Gauge label="TRADES / SECOND" value={stats.tradesPerSecond ?? 0} max={400}  color={C.green} />
-              <Gauge label="QUEUE DEPTH"     value={stats.queueDepth ?? 0}      max={2000}  color="#FFB800" />
-              <Gauge label="GATEWAY LATENCY" value={stats.latency?.gatewayUs ?? 0}  max={200} color="#6B7280" unit="µs" />
-              <Gauge label="MATCHING LATENCY"value={stats.latency?.matchingUs ?? 0} max={300} color="#00BFFF" unit="µs" />
+          <>
+            <Gauge label="ORDERS / TICK" value={orderRate} max={50} color={C.green} />
+            <Gauge label="FILLS / TICK"  value={fillRate}  max={40} color={C.green} />
+            <Gauge label="ACTIVE TRADERS" value={activeTraders} max={traders.length} color="#FFB800" />
+            <Gauge label="AVG WIN RATE"  value={Math.round(avgWinRate * 100)} max={100} color="#00BFFF" unit="%" />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12, paddingTop: 12, borderTop: "1px solid #1a1a1a" }}>
-                {[
-                  { label: "RECEIVED",  val: stats.ordersReceived ?? 0, color: "#fff" },
-                  { label: "FILLED",    val: stats.ordersFilled ?? 0,   color: C.green },
-                  { label: "REJECTED",  val: stats.ordersRejected ?? 0, color: C.red },
-                ].map(({ label, val, color }) => (
-                  <div key={label}>
-                    <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", marginBottom: 3 }}>{label}</div>
-                    <motion.div key={val} animate={{ scale: [1.05, 1] }} style={{ fontSize: 16, fontWeight: 700, color }} className="num">
-                      {val.toLocaleString()}
-                    </motion.div>
-                  </div>
-                ))}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
+              marginTop: 12, paddingTop: 12, borderTop: "1px solid #1a1a1a"
+            }}>
+              <div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", marginBottom: 3 }}>TOTAL ORDERS</div>
+                <motion.div key={totalOrdersPlaced} animate={{ scale: [1.05, 1] }} style={{ fontSize: 16, fontWeight: 700, color: "#fff" }} className="num">
+                  {totalOrdersPlaced.toLocaleString()}
+                </motion.div>
               </div>
-            </>
-          ) : (
-            <div style={{ color: "#555", fontSize: 12, padding: 20, textAlign: "center" }}>Loading stats...</div>
-          )}
+              <div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", marginBottom: 3 }}>TOTAL FILLS</div>
+                <motion.div key={totalFills} animate={{ scale: [1.05, 1] }} style={{ fontSize: 16, fontWeight: 700, color: C.green }} className="num">
+                  {totalFills.toLocaleString()}
+                </motion.div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", marginBottom: 3 }}>LONG / SHORT</div>
+                <motion.div key={`${longTraders}-${shortTraders}`} animate={{ scale: [1.05, 1] }} style={{ fontSize: 16, fontWeight: 700, color: "#fff" }} className="num">
+                  {longTraders} <span style={{ color: C.green, fontSize: 11 }}>▲</span> / {shortTraders} <span style={{ color: C.red, fontSize: 11 }}>▼</span>
+                </motion.div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", marginBottom: 3 }}>TOTAL P&L</div>
+                <motion.div key={totalPnl} animate={{ scale: [1.05, 1] }} style={{ fontSize: 16, fontWeight: 700, color: totalPnl >= 0 ? C.green : C.red }} className="num">
+                  {totalPnl >= 0 ? "+" : ""}${(Math.abs(totalPnl) / 1000).toFixed(1)}K
+                </motion.div>
+              </div>
+            </div>
+          </>
         </div>
       </div>
 
       {/* AI Traders */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: "#555", letterSpacing: "0.1em", marginBottom: 14 }}>AI TRADERS · {traders?.length ?? 0} ACTIVE</div>
+        <div style={{ fontSize: 10, color: "#555", letterSpacing: "0.1em", marginBottom: 14 }}>AI TRADERS · {traders.length ?? 0} ACTIVE</div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
             <thead>
@@ -198,7 +252,7 @@ export default function Control() {
             </thead>
             <tbody>
               <AnimatePresence>
-                {traders?.map((t: any, i: number) => {
+                {traders.map((t: any, i: number) => {
                   const typeColor = TRADER_COLORS[t.type] ?? "#888";
                   const pnlColor = t.pnl >= 0 ? C.green : C.red;
                   return (
@@ -236,7 +290,7 @@ export default function Control() {
               </AnimatePresence>
             </tbody>
           </table>
-          {!traders?.length && (
+          {!traders.length && (
             <div style={{ padding: 20, color: "#555", fontSize: 11, textAlign: "center" }}>AI traders initializing...</div>
           )}
         </div>
@@ -264,7 +318,7 @@ export default function Control() {
             }}
           />
           <button
-            onClick={handleExplain}
+            onClick={() => handleExplain()}
             disabled={explainPending || !question.trim()}
             style={{
               padding: "8px 16px",
@@ -308,22 +362,25 @@ export default function Control() {
             "How does price-time priority prevent gaming?",
             "What causes a flash crash?",
             "Why is queue depth important for latency?",
-          ].map(q => (
-            <button
-              key={q}
-              onClick={() => setQuestion(q)}
-              style={{
-                padding: "3px 8px",
-                background: "#111",
-                border: "1px solid #2a2a2a",
-                borderRadius: 3,
-                color: "#555",
-                cursor: "pointer",
-                fontSize: 10,
-                fontFamily: "monospace",
-              }}
-            >{q}</button>
-          ))}
+          ].map(q => {
+            const asked = askedQuestions.has(q);
+            return (
+              <button
+                key={q}
+                onClick={() => handleQuickQuestion(q)}
+                style={{
+                  padding: "3px 8px",
+                  background: asked ? "rgba(0,255,136,0.08)" : "#111",
+                  border: `1px solid ${asked ? "#00FF88" : "#2a2a2a"}`,
+                  borderRadius: 3,
+                  color: asked ? "#00FF88" : "#555",
+                  cursor: "pointer",
+                  fontSize: 10,
+                  fontFamily: "monospace",
+                }}
+              >{q}</button>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -71,8 +71,8 @@ class MatchingEngine {
         execSync(`g++ -std=c++20 -O2 -o "${engineBin}" "${engineSrc}"`, { stdio: "pipe" });
         logger.info("Matching engine compiled successfully");
       } catch (err: any) {
-        logger.error({ err: err.message, stderr: err.stderr?.toString() }, "Failed to compile matching engine");
-        throw err;
+        logger.warn({ err: err.message, stderr: err.stderr?.toString() }, "Failed to compile matching engine, using JS fallback");
+        return;
       }
     }
 

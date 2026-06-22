@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { engine } from "./matchingEngine";
-import { getCurrentPrice, getSymbols } from "./marketData";
+import { getCurrentPrice, getSymbols, getTradingIntensity } from "./marketData";
 import { db } from "@workspace/db";
 import { ordersTable, tradesTable } from "@workspace/db";
 import { logger } from "./logger";
@@ -28,6 +28,8 @@ function randInt(min: number, max: number) { return Math.round(rand(min, max)); 
 async function placeOrder(trader: TraderState, side: "buy" | "sell", type: "market" | "limit", qty: number, price?: number) {
   const id = uuidv4();
   const curPrice = getCurrentPrice(trader.symbol);
+  const intensity = getTradingIntensity(trader.symbol);
+  const scaledQty = Math.max(1, Math.round(qty * intensity));
   const limitPrice = price ?? (side === "buy" ? curPrice * 0.999 : curPrice * 1.001);
 
   try {
@@ -36,7 +38,7 @@ async function placeOrder(trader: TraderState, side: "buy" | "sell", type: "mark
       symbol: trader.symbol,
       type,
       side,
-      qty,
+      qty: scaledQty,
       price: type === "limit" ? +limitPrice.toFixed(2) : 0,
     });
 
@@ -86,8 +88,9 @@ async function placeOrder(trader: TraderState, side: "buy" | "sell", type: "mark
   }
 }
 
-// Retail: small random orders every 3-8s
+// Retail: small random orders every 2-6s (scaled by volume intensity)
 function startRetailTrader(trader: TraderState) {
+  const intensity = getTradingIntensity(trader.symbol);
   const tick = async () => {
     if (!running || !trader.isActive) return;
     const side: "buy" | "sell" = Math.random() > 0.5 ? "buy" : "sell";
@@ -96,25 +99,31 @@ function startRetailTrader(trader: TraderState) {
     const limitOffset = rand(-0.005, 0.005);
     await placeOrder(trader, side, "limit", qty, price * (1 + limitOffset));
   };
-  return setInterval(tick, rand(3000, 8000));
+  // Higher intensity = more frequent trading (inverse relationship)
+  const interval = Math.round(rand(3000, 8000) / intensity);
+  return setInterval(tick, interval);
 }
 
-// Market maker: maintains spread on both sides
+// Market maker: maintains spread on both sides (tighter for liquid stocks)
 function startMarketMaker(trader: TraderState) {
+  const intensity = getTradingIntensity(trader.symbol);
   const tick = async () => {
     if (!running || !trader.isActive) return;
     const mid = getCurrentPrice(trader.symbol);
-    const spread = mid * 0.002; // 0.2% spread
+    // Tighter spread for high-intensity (liquid) stocks: 0.2% down to 0.06%
+    const spread = mid * (0.002 / intensity);
     const qty = randInt(50, 300);
     await placeOrder(trader, "buy",  "limit", qty, mid - spread / 2);
     await placeOrder(trader, "sell", "limit", qty, mid + spread / 2);
   };
-  return setInterval(tick, rand(2000, 5000));
+  const interval = Math.round(rand(2000, 5000) / intensity);
+  return setInterval(tick, interval);
 }
 
 // Momentum: follows price direction
 let prevPrices: Record<string, number> = {};
 function startMomentumTrader(trader: TraderState) {
+  const intensity = getTradingIntensity(trader.symbol);
   const tick = async () => {
     if (!running || !trader.isActive) return;
     const cur = getCurrentPrice(trader.symbol);
@@ -123,22 +132,24 @@ function startMomentumTrader(trader: TraderState) {
     const pctChange = (cur - prev) / prev;
     if (Math.abs(pctChange) > 0.001) {
       const side: "buy" | "sell" = pctChange > 0 ? "buy" : "sell";
-      const qty = Math.round(Math.abs(pctChange) * 100000);
+      const qty = Math.round(Math.abs(pctChange) * 100000 * intensity);
       await placeOrder(trader, side, "market", Math.max(qty, 50));
     }
   };
-  return setInterval(tick, 2500);
+  const interval = Math.round(2500 / intensity);
+  return setInterval(tick, interval);
 }
 
 // Panic: sells aggressively during drops
 function startPanicTrader(trader: TraderState) {
+  const intensity = getTradingIntensity(trader.symbol);
   const tick = async () => {
     if (!running || !trader.isActive) return;
     const cur = getCurrentPrice(trader.symbol);
     const prev = prevPrices[trader.symbol] ?? cur;
     const drop = (prev - cur) / prev;
     if (drop > 0.005) {
-      // Panic sell
+      // Panic sell — scale with intensity
       const qty = randInt(200, 1000);
       await placeOrder(trader, "sell", "market", qty);
       trader.lastAction = `PANIC SELL ${qty} ${trader.symbol}`;
@@ -148,16 +159,19 @@ function startPanicTrader(trader: TraderState) {
       await placeOrder(trader, "buy", "limit", qty, cur * 0.995);
     }
   };
-  return setInterval(tick, 3000);
+  const interval = Math.round(3000 / intensity);
+  return setInterval(tick, interval);
 }
 
 export function initAiTraders() {
   const symbols = getSymbols();
   const types: Array<"retail" | "market_maker" | "momentum" | "panic"> = ["retail", "market_maker", "momentum", "panic"];
 
+  let symIdx = 0;
   for (const type of types) {
     for (let i = 0; i < 2; i++) {
-      const sym = symbols[Math.floor(Math.random() * symbols.length)];
+      const sym = symbols[symIdx % symbols.length];
+      symIdx++;
       traders.push({
         id: `${type}_${i + 1}`,
         type,

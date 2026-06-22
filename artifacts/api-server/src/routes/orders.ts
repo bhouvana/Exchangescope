@@ -7,12 +7,27 @@ import { db } from "@workspace/db";
 import { ordersTable, tradesTable, marketEventsTable } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { ensureOrderBookLiquidity } from "../lib/orderBookSeed";
+import { getUserId } from "../lib/session";
 
 const router: IRouter = Router();
 
-// Pipeline stage builder — realistic latencies
-function buildPipeline(latUs: number) {
+interface PipelineOrderCtx {
+  id: string;
+  symbol: string;
+  side: string;
+  type: string;
+  qty: number;
+  price: number;
+  status: string;
+  filledQty: number;
+  tradeCount: number;
+}
+
+// Pipeline stage builder — realistic latencies with order-specific detail
+function buildPipeline(latUs: number, ctx: PipelineOrderCtx) {
   const now = Date.now();
+  const seq = Date.now();
   const gatewayUs   = Math.round(30 + Math.random() * 50);
   const riskUs      = Math.round(20 + Math.random() * 40);
   const validUs     = Math.round(10 + Math.random() * 20);
@@ -21,6 +36,10 @@ function buildPipeline(latUs: number) {
   const execUs      = Math.round(20 + Math.random() * 40);
   const broadcastUs = Math.round(10 + Math.random() * 30);
   const dashUs      = Math.round(5  + Math.random() * 15);
+  const px = ctx.price > 0 ? ctx.price.toFixed(2) : "MKT";
+  const sideTag = ctx.side === "buy" ? "1" : "2";
+  const filled = ctx.filledQty > 0;
+  const queued = ctx.status === "queued" || ctx.status === "partial";
 
   let elapsed = 0;
   const stage = (name: string, us: number, detail?: string) => {
@@ -29,21 +48,37 @@ function buildPipeline(latUs: number) {
   };
 
   return [
-    stage("Trader",               0,         "Order submitted by trader"),
-    stage("Gateway",              gatewayUs, "TCP packet received, session authenticated"),
-    stage("Risk Check",           riskUs,    "Position limits and buying power verified"),
-    stage("Validation",           validUs,   "Symbol, quantity, price constraints validated"),
-    stage("Order Queue",          queueUs,   "Order enqueued at sequence " + Date.now()),
-    stage("Matching Engine",      matchUs,   "Price-time priority scan across order book"),
-    stage("Trade Execution",      execUs,    "Fill confirmed, counterparty notified"),
-    stage("Market Data Broadcast",broadcastUs,"ITCH 5.0 feed updated"),
-    stage("Dashboard Update",     dashUs,    "UI state refreshed"),
+    stage("Trader", 0,
+      `POST /api/orders → ${ctx.side.toUpperCase()} ${ctx.qty} ${ctx.symbol} @ ${px} (${ctx.type})`),
+    stage("Gateway", gatewayUs,
+      `FIX 35=D │ 11=${ctx.id.slice(0, 8)} │ 55=${ctx.symbol} │ 54=${sideTag} │ 38=${ctx.qty} │ session=AUTH_OK`),
+    stage("Risk Check", riskUs,
+      `buying_power=PASS │ position_limit=PASS │ fat_finger=PASS │ exposure=OK`),
+    stage("Validation", validUs,
+      `sym=${ctx.symbol} ✓ │ qty=${ctx.qty} ✓ │ tick=0.01 ✓ │ luld=PASS │ type=${ctx.type.toUpperCase()} ✓`),
+    stage("Order Queue", queueUs,
+      `ENQUEUE seq=${seq} │ partition=${ctx.symbol} │ mpsc_lockfree │ depth+1`),
+    stage("Matching Engine", matchUs,
+      filled
+        ? `price_time scan → ${ctx.tradeCount} fill(s) │ ${ctx.filledQty}/${ctx.qty} shares @ engine lat ${matchUs}µs`
+        : `price_time scan → no cross │ resting in book @ ${px}`),
+    stage("Trade Execution", execUs,
+      filled
+        ? `EXEC 35=8 │ 150=${ctx.status === "filled" ? "2(FILLED)" : "1(PARTIAL)"} │ 32=${ctx.filledQty} │ 31=${px}`
+        : `EXEC 35=8 │ 150=0(NEW) │ order resting │ book level created`),
+    stage("Market Data Broadcast", broadcastUs,
+      filled
+        ? `ITCH type=E │ ${ctx.symbol} │ exec_qty=${ctx.filledQty} │ subscribers=fanout`
+        : `ITCH type=A │ ${ctx.symbol} │ new_${ctx.side}_level │ price=${px}`),
+    stage("Dashboard Update", dashUs,
+      `WS order_update + ${filled ? "trade + " : ""}book_delta → client render`),
   ];
 }
 
 router.get("/orderbook/:symbol", async (req, res): Promise<void> => {
   const symbol = (Array.isArray(req.params.symbol) ? req.params.symbol[0] : req.params.symbol).toUpperCase();
   try {
+    await ensureOrderBookLiquidity(symbol);
     const ob = await engine.getOrderBook(symbol);
     const curPrice = getCurrentPrice(symbol);
     res.json({
@@ -114,7 +149,8 @@ router.post("/orders", async (req, res): Promise<void> => {
     const status = result.status ?? "queued";
     recordOrder(status);
 
-    // Persist order
+    const userId = getUserId(req);
+
     await db.insert(ordersTable).values({
       id, symbol: sym, type, side,
       quantity: qty,
@@ -123,11 +159,11 @@ router.post("/orders", async (req, res): Promise<void> => {
       filledQuantity: result.filledQty ?? 0,
       avgFillPrice: result.avgPrice ?? null,
       traderId: null,
+      userId,
     }).onConflictDoNothing();
 
     const trades = result.trades ?? [];
 
-    // Persist trades
     for (const t of trades) {
       await db.insert(tradesTable).values({
         id: t.id,
@@ -139,6 +175,7 @@ router.post("/orders", async (req, res): Promise<void> => {
         sellOrderId: t.sellOrderId,
         buyTraderId: null,
         sellTraderId: null,
+        userId,
       }).onConflictDoNothing();
     }
 
@@ -168,7 +205,13 @@ router.post("/orders", async (req, res): Promise<void> => {
     }
     broadcastOrderUpdate({ orderId: id, status, filledQty: result.filledQty ?? 0 });
 
-    const pipeline = buildPipeline(result.latUs ?? 0);
+    const pipeline = buildPipeline(result.latUs ?? 0, {
+      id, symbol: sym, side, type, qty,
+      price: lmtPrice,
+      status,
+      filledQty: result.filledQty ?? 0,
+      tradeCount: trades.length,
+    });
     const orderOut = {
       id, symbol: sym, type, side,
       quantity: qty,
@@ -177,6 +220,7 @@ router.post("/orders", async (req, res): Promise<void> => {
       filledQuantity: result.filledQty ?? 0,
       avgFillPrice: result.avgPrice ?? null,
       traderId: null,
+      userId,
       createdAt: new Date().toISOString(),
       updatedAt: null,
     };

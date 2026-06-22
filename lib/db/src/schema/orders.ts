@@ -13,6 +13,7 @@ export const ordersTable = pgTable("orders", {
   filledQuantity: doublePrecision("filled_quantity").notNull().default(0),
   avgFillPrice: doublePrecision("avg_fill_price"),
   traderId: text("trader_id"),
+  userId: text("user_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }),
 });

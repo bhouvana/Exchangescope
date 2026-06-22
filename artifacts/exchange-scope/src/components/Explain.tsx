@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ExplainProps {
   term: string;
@@ -8,63 +8,76 @@ interface ExplainProps {
 }
 
 export function ExplainTip({ term, explanation, children }: ExplainProps) {
-  const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 4 }}>
-      {children ?? <span style={{ color: "#00FF88", borderBottom: "1px dashed #00FF8866", cursor: "help" }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>{term}</span>}
-      <span
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        style={{
-          width: 14, height: 14, borderRadius: "50%",
-          background: "#1a1a1a",
-          border: "1px solid #333",
-          color: "#666",
-          fontSize: 9,
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          cursor: "help", flexShrink: 0, fontWeight: 700,
-        }}
-      >?</span>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          {children ?? (
+            <span
+              style={{
+                color: "#00FF88",
+                borderBottom: "1px dashed #00FF8866",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+              }}
+            >
+              {term}
+            </span>
+          )}
+          <span
             style={{
-              position: "absolute",
-              bottom: "calc(100% + 8px)",
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 260,
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
               background: "#1a1a1a",
-              border: "1px solid #00FF8840",
-              borderRadius: 6,
-              padding: "10px 12px",
-              zIndex: 9999,
-              pointerEvents: "none",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
+              border: "1px solid #333",
+              color: "#666",
+              fontSize: 9,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              fontWeight: 700,
             }}
           >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#00FF88", marginBottom: 4, letterSpacing: "0.05em" }}>
-              {term}
-            </div>
-            <div style={{ fontSize: 11, color: "#ccc", lineHeight: 1.6 }}>{explanation}</div>
-            {/* Arrow */}
-            <div style={{
-              position: "absolute",
-              bottom: -5, left: "50%", transform: "translateX(-50%)",
-              width: 8, height: 8,
-              background: "#1a1a1a",
-              border: "1px solid #00FF8840",
-              borderTop: "none", borderLeft: "none",
-              rotate: "45deg",
-            }} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </span>
+            ?
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        sideOffset={8}
+        collisionPadding={16}
+        style={{
+          width: 300,
+          background: "#1a1a1a",
+          border: "1px solid #00FF8840",
+          borderRadius: 6,
+          padding: "12px 14px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+          fontFamily: "monospace",
+        }}
+      >
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#00FF88", marginBottom: 6, letterSpacing: "0.05em" }}>
+          {term}
+        </div>
+        <div style={{ fontSize: 11, color: "#ccc", lineHeight: 1.65 }}>{explanation}</div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

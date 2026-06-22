@@ -12,6 +12,7 @@ export const tradesTable = pgTable("trades", {
   sellOrderId: text("sell_order_id").notNull(),
   buyTraderId: text("buy_trader_id"),
   sellTraderId: text("sell_trader_id"),
+  userId: text("user_id"),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
 });
 
