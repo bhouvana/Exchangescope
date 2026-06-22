@@ -17,6 +17,11 @@ Real-time order matching · Live market data across 4 exchanges · AI-powered re
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-exchangescope.onrender.com-00FF88?logo=render&logoColor=white)](https://exchangescope.onrender.com)
 
 </div>
+---
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-exchangescope.onrender.com-00FF88?logo=render&logoColor=white)](https://exchangescope.onrender.com)
+
+---
 
 ---
 
