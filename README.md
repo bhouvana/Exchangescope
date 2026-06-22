@@ -2,7 +2,7 @@
 
 # ExchangeScope
 
-**A full-stack stock market simulation & intelligence platform**
+**A full-stack stock market intelligence platform**
 
 Real-time order matching · Live market data across 4 exchanges · AI-powered research · Interactive candlestick charts
 
@@ -21,7 +21,7 @@ Real-time order matching · Live market data across 4 exchanges · AI-powered re
 
 ## What is ExchangeScope?
 
-ExchangeScope is a production-grade financial simulation platform that brings four of the world's major stock exchanges to one place. It streams live prices from Yahoo Finance for over **1,200 companies** across NASDAQ, NYSE, NSE (India), and BSE (India), runs a real matching engine that executes orders in microseconds, and layers Groq-powered AI on top for company research, investment thesis generation, news sentiment analysis, and an always-on learning assistant.
+ExchangeScope is a production-grade financial intelligence platform that brings four of the world's major stock exchanges to one place. It streams live prices from Yahoo Finance for over **1,200 companies** across NASDAQ, NYSE, NSE (India), and BSE (India), runs a real matching engine that executes orders in microseconds, and layers Groq-powered AI on top for company research, investment thesis generation, news sentiment analysis, and an always-on learning assistant.
 
 Everything — market data, order execution, AI insights — updates in real time via WebSocket. There are no mocked delays or fake numbers; prices come from Yahoo Finance on 5-minute cycles, market caps from Finnhub, and research from a 70-billion-parameter language model.
 
@@ -48,7 +48,7 @@ Everything — market data, order execution, AI insights — updates in real tim
 
 ### Order Matching Engine
 - **Market and limit orders** with price-time priority
-- **Full execution pipeline** with realistic latency simulation at each stage:
+- **Full execution pipeline** with measured latency at each stage:
   - Gateway (30–80 µs) → Risk Check → Validation → Queue → Matching Engine (40–140 µs) → Execution → Broadcast → Dashboard
 - **Partial fills**, order cancellations, and rejection handling
 - **Live order book** with bid/ask depth visualization
@@ -70,7 +70,7 @@ Everything — market data, order execution, AI insights — updates in real tim
 - **Daily Briefing** — AI-generated market summary cached per region per day
 - **Learning Assistant** — explain any financial concept at beginner, intermediate, or advanced level
 
-### Market Control & Simulation
+### Market Control
 - **Scenarios** — Flash Crash, Bull Market, Bear Market, High Volatility mode, Pause, Reset
 - All scenarios broadcast to connected clients and affect AI trader behavior
 - **Market events log** — full replay of all control actions
@@ -355,153 +355,28 @@ Navigate to **http://localhost:20691**
 
 ## Deployment on Render
 
-ExchangeScope can be deployed on [Render](https://render.com/) using a PostgreSQL managed database and two web services (API + frontend).
+The repo includes `render.yaml` — Render's blueprint format. It provisions a managed PostgreSQL database and a single Node.js web service that builds both the frontend and API, then serves everything from one URL.
 
-### Step 1 — Create a PostgreSQL database on Render
+### Deploy in 3 steps
 
-1. In the Render dashboard, click **New → PostgreSQL**
-2. Name it `exchangescope-db`
-3. Choose the free or starter plan
-4. Copy the **Internal Database URL** for use in your web service env vars
+**1. Connect the repo**
 
-### Step 2 — Deploy the API server
+Go to [render.com](https://render.com) → **New → Blueprint** → connect `bhouvana/Exchangescope`. Render detects `render.yaml` and shows two resources to create: the database and the web service. Click **Apply**.
 
-1. Click **New → Web Service**
-2. Connect your GitHub repo (`bhouvana/Exchangescope`)
-3. Configure the service:
+**2. Set your API keys**
 
-| Setting | Value |
-|---|---|
-| **Name** | `exchangescope-api` |
-| **Root Directory** | `artifacts/api-server` |
-| **Runtime** | Node |
-| **Build Command** | `cd ../.. && pnpm install && node ./build.mjs` |
-| **Start Command** | `node --enable-source-maps ./dist/index.mjs` |
-| **Instance Type** | Starter ($7/month) or Free |
-
-4. Add environment variables:
+After the first deploy completes, go to the `exchangescope` web service → **Environment** and set:
 
 ```
-DATABASE_URL          = (Internal URL from your Render PostgreSQL)
-FINNHUB_API_KEY       = your_finnhub_key
-GROQ_API_KEY          = your_groq_key
-SESSION_SECRET        = a-long-random-secret-string
-PORT                  = 10000
-NODE_ENV              = production
+FINNHUB_API_KEY   your key from finnhub.io
+GROQ_API_KEY      your key from console.groq.com
 ```
 
-> **Note**: Render assigns port 10000 internally. The `PORT` env var will be set automatically by Render; you can also leave it out and let the server default to 8082 — Render's proxy handles the mapping.
+Click **Save Changes** — Render redeploys automatically.
 
-### Step 3 — Push the database schema
+**3. Done**
 
-After the API service first deploys, run a one-off command via the Render Shell (under your web service → Shell tab):
-
-```bash
-cd lib/db && node -e "require('child_process').execSync('npx drizzle-kit push', {stdio:'inherit'})"
-```
-
-Or add it to the build command temporarily:
-
-```bash
-cd ../.. && pnpm install && pnpm --filter @workspace/db exec drizzle-kit push && cd artifacts/api-server && node ./build.mjs
-```
-
-Then trigger the seed:
-
-```bash
-curl -X POST https://exchangescope-api.onrender.com/api/seed/companies
-```
-
-### Step 4 — Deploy the frontend
-
-1. Click **New → Static Site** (or Web Service for SSR)
-2. Configure:
-
-| Setting | Value |
-|---|---|
-| **Name** | `exchangescope-ui` |
-| **Root Directory** | `artifacts/exchange-scope` |
-| **Build Command** | `cd ../.. && pnpm install && cd artifacts/exchange-scope && npx vite build` |
-| **Publish Directory** | `artifacts/exchange-scope/dist/public` |
-
-3. Add environment variable:
-
-```
-VITE_API_URL = https://exchangescope-api.onrender.com
-```
-
-4. Add a **Rewrite Rule** so client-side routing works:
-
-| Source | Destination | Action |
-|---|---|---|
-| `/*` | `/index.html` | Rewrite |
-
-> **Important**: Update the Vite proxy in `artifacts/exchange-scope/vite.config.ts` to point to your Render API URL for production builds, or set `VITE_API_URL` and read it from `import.meta.env` in your fetch calls.
-
-### Step 5 — Configure CORS
-
-In your API server environment, set:
-
-```
-FRONTEND_URL = https://exchangescope-ui.onrender.com
-```
-
-And update `artifacts/api-server/src/app.ts` CORS origin to match:
-
-```typescript
-origin: process.env.FRONTEND_URL || true,
-```
-
-### Render render.yaml (optional one-click deploy)
-
-Create `render.yaml` in the repo root for infrastructure-as-code deployment:
-
-```yaml
-databases:
-  - name: exchangescope-db
-    databaseName: exchangescope
-    user: postgres
-    plan: free
-
-services:
-  - type: web
-    name: exchangescope-api
-    runtime: node
-    rootDir: artifacts/api-server
-    buildCommand: cd ../.. && pnpm install && node ./build.mjs
-    startCommand: node --enable-source-maps ./dist/index.mjs
-    plan: starter
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: exchangescope-db
-          property: connectionString
-      - key: NODE_ENV
-        value: production
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: FINNHUB_API_KEY
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-
-  - type: web
-    name: exchangescope-ui
-    runtime: static
-    rootDir: artifacts/exchange-scope
-    buildCommand: cd ../.. && pnpm install && cd artifacts/exchange-scope && npx vite build
-    staticPublishPath: dist/public
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          name: exchangescope-api
-          type: web
-          property: hostURL
-```
+The app is live. `DATABASE_URL` and `SESSION_SECRET` are wired up automatically by `render.yaml`; company data seeds itself on every startup.
 
 ---
 
